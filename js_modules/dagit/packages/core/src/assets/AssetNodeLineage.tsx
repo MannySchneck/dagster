@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  ButtonGroup,
-  Checkbox,
-  Colors,
-  Icon,
-  JoinedButtons,
-  TextInput,
-} from '@dagster-io/ui';
+import {Box, Button, ButtonGroup, Colors, Icon, JoinedButtons, TextInput} from '@dagster-io/ui';
 import * as React from 'react';
 
 import {GraphData, LiveData} from '../asset-graph/Utils';
@@ -66,17 +57,6 @@ export const AssetNodeLineage: React.FC<{
           value={Math.max(1, Math.min(maxDepth, requestedDepth))}
           onChange={(depth) => setParams({...params, lineageDepth: depth})}
           max={maxDepth}
-        />
-        <Checkbox
-          format="switch"
-          label="Include secondary edges"
-          checked={!!params.lineageShowSecondaryEdges}
-          onChange={() =>
-            setParams({
-              ...params,
-              lineageShowSecondaryEdges: params.lineageShowSecondaryEdges ? undefined : true,
-            })
-          }
         />
         <div style={{flex: 1}} />
         {Object.values(assetGraphData.nodes).length > 1 ? (
