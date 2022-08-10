@@ -8,6 +8,7 @@ from dagstermill.io_managers import local_output_notebook_io_manager
 from dagster import (
     Field,
     FileHandle,
+    In,
     Int,
     List,
     Out,
@@ -15,19 +16,13 @@ from dagster import (
     String,
     fs_io_manager,
     job,
+    op,
     repository,
     resource,
 )
 from dagster._core.definitions.utils import DEFAULT_OUTPUT
 from dagster._core.storage.file_manager import local_file_manager
-from dagster._legacy import (
-    InputDefinition,
-    ModeDefinition,
-    OutputDefinition,
-    composite_solid,
-    pipeline,
-    solid,
-)
+from dagster._legacy import ModeDefinition, composite_solid, pipeline
 from dagster._utils import PICKLE_PROTOCOL, file_relative_path
 
 try:
@@ -38,14 +33,14 @@ except ImportError:
     DAGSTER_PANDAS_PRESENT = False
 
 try:
-    import sklearn as _
+    pass  # pylint: disable=unnecessary-pass
 
     SKLEARN_PRESENT = True
 except ImportError:
     SKLEARN_PRESENT = False
 
 try:
-    import matplotlib as _
+    pass  # pylint: disable=unnecessary-pass
 
     MATPLOTLIB_PRESENT = True
 except ImportError:
@@ -65,13 +60,13 @@ def nb_test_path(name):
 
 
 def test_nb_solid(name, **kwargs):
-    output_defs = kwargs.pop("output_defs", [OutputDefinition(is_required=False)])
+    outs = kwargs.pop("outs", {"result": Out(is_required=False)})
 
-    return dagstermill.factory.define_dagstermill_solid(
+    return dagstermill.factory.define_dagstermill_op(
         name=name,
         notebook_path=nb_test_path(name),
         output_notebook_name="notebook",
-        output_defs=output_defs,
+        outs=outs,
         **kwargs,
     )
 
@@ -98,7 +93,7 @@ default_mode_defs = [
 ]
 
 
-hello_world = test_nb_solid("hello_world", output_defs=[])
+hello_world = test_nb_solid("hello_world", outs={})
 
 
 @pipeline(mode_defs=default_mode_defs)
@@ -125,7 +120,7 @@ def build_hello_world_job():
     return hello_world_job
 
 
-hello_world_with_custom_tags_and_description = dagstermill.factory.define_dagstermill_solid(
+hello_world_with_custom_tags_and_description = dagstermill.factory.define_dagstermill_op(
     name="hello_world_custom",
     notebook_path=nb_test_path("hello_world"),
     output_notebook_name="notebook",
@@ -145,7 +140,7 @@ hello_world_config = test_nb_solid(
 )
 
 
-goodbye_config = dagstermill.factory.define_dagstermill_solid(
+goodbye_config = dagstermill.factory.define_dagstermill_op(
     name="goodbye_config",
     notebook_path=nb_test_path("print_dagstermill_context_solid_config"),
     output_notebook_name="notebook",
@@ -165,7 +160,7 @@ def alias_config_pipeline():
     goodbye_config.alias("aliased_goodbye")()
 
 
-@solid(input_defs=[InputDefinition("notebook")])
+@op(ins={"notebook": In()})
 def load_notebook(notebook):
     return notebook
 
@@ -176,7 +171,7 @@ def hello_world_with_output_notebook_pipeline():
     load_notebook(notebook)
 
 
-hello_world_no_output_notebook_no_file_manager = dagstermill.factory.define_dagstermill_solid(
+hello_world_no_output_notebook_no_file_manager = dagstermill.factory.define_dagstermill_op(
     name="hello_world_no_output_notebook_no_file_manager",
     notebook_path=nb_test_path("hello_world"),
 )
@@ -187,7 +182,7 @@ def hello_world_no_output_notebook_no_file_manager_pipeline():
     hello_world_no_output_notebook_no_file_manager()
 
 
-hello_world_no_output_notebook = dagstermill.factory.define_dagstermill_solid(
+hello_world_no_output_notebook = dagstermill.factory.define_dagstermill_op(
     name="hello_world_no_output_notebook",
     notebook_path=nb_test_path("hello_world"),
 )
@@ -198,7 +193,7 @@ def hello_world_no_output_notebook_pipeline():
     hello_world_no_output_notebook()
 
 
-hello_world_output = test_nb_solid("hello_world_output", output_defs=[OutputDefinition(str)])
+hello_world_output = test_nb_solid("hello_world_output", outs={"result": Out(str)})
 
 
 @pipeline(mode_defs=default_mode_defs)
@@ -206,9 +201,7 @@ def hello_world_output_pipeline():
     hello_world_output()
 
 
-hello_world_explicit_yield = test_nb_solid(
-    "hello_world_explicit_yield", output_defs=[OutputDefinition(str)]
-)
+hello_world_explicit_yield = test_nb_solid("hello_world_explicit_yield", outs={"result": Out(str)})
 
 
 @pipeline(mode_defs=default_mode_defs)
@@ -226,40 +219,35 @@ def hello_logging_pipeline():
 
 add_two_numbers = test_nb_solid(
     "add_two_numbers",
-    input_defs=[
-        InputDefinition(name="a", dagster_type=Int),
-        InputDefinition(name="b", dagster_type=Int),
-    ],
-    output_defs=[OutputDefinition(Int)],
+    ins={
+        "a": In(Int),
+        "b": In(Int),
+    },
+    outs={"result": Out(Int)},
 )
 
 
 mult_two_numbers = test_nb_solid(
-    "mult_two_numbers",
-    input_defs=[
-        InputDefinition(name="a", dagster_type=Int),
-        InputDefinition(name="b", dagster_type=Int),
-    ],
-    output_defs=[OutputDefinition(Int)],
+    "mult_two_numbers", ins={"a": In(Int), "b": In(Int)}, outs={"result": Out(Int)}
 )
 
 
-@solid
+@op
 def return_one():
     return 1
 
 
-@solid
+@op
 def return_two():
     return 2
 
 
-@solid
+@op
 def return_three():
     return 3
 
 
-@solid
+@op
 def return_four():
     return 4
 
@@ -275,9 +263,9 @@ def double_add_pipeline():
     add_two_numbers.alias("add_two_numbers_2")(return_three(), return_four())
 
 
-@solid(input_defs=[], config_schema=Int)
+@op(ins={}, config_schema=Int)
 def load_constant(context):
-    return context.solid_config
+    return context.op_config
 
 
 @pipeline(mode_defs=default_mode_defs)
@@ -298,18 +286,12 @@ def error_pipeline():
 
 if DAGSTER_PANDAS_PRESENT and SKLEARN_PRESENT and MATPLOTLIB_PRESENT:
 
-    clean_data = test_nb_solid("clean_data", output_defs=[OutputDefinition(DataFrame)])
+    clean_data = test_nb_solid("clean_data", outs={"result": Out(DataFrame)})
 
     # FIXME add an output to this
-    tutorial_LR = test_nb_solid(
-        "tutorial_LR",
-        input_defs=[InputDefinition(name="df", dagster_type=DataFrame)],
-    )
+    tutorial_LR = test_nb_solid("tutorial_LR", ins={"df": In(DataFrame)})
 
-    tutorial_RF = test_nb_solid(
-        "tutorial_RF",
-        input_defs=[InputDefinition(name="df", dagster_type=DataFrame)],
-    )
+    tutorial_RF = test_nb_solid("tutorial_RF", ins={"df": In(DataFrame)})
 
     @pipeline(mode_defs=default_mode_defs)
     def tutorial_pipeline():
@@ -319,21 +301,21 @@ if DAGSTER_PANDAS_PRESENT and SKLEARN_PRESENT and MATPLOTLIB_PRESENT:
         tutorial_RF(dfr)
 
 
-@solid("resource_solid", required_resource_keys={"list"})
-def resource_solid(context):
+@op(name="resource_op", required_resource_keys={"list"})
+def resource_op(context):
     context.resources.list.append("Hello, solid!")
     return True
 
 
 hello_world_resource = test_nb_solid(
     "hello_world_resource",
-    input_defs=[InputDefinition("nonce")],
+    ins={"nonce": In()},
     required_resource_keys={"list"},
 )
 
 hello_world_resource_with_exception = test_nb_solid(
     "hello_world_resource_with_exception",
-    input_defs=[InputDefinition("nonce")],
+    ins={"nonce": In()},
     required_resource_keys={"list"},
 )
 
@@ -403,7 +385,7 @@ def filepicklelist_resource(init_context):
     ]
 )
 def resource_pipeline():
-    hello_world_resource(resource_solid())
+    hello_world_resource(resource_op())
 
 
 @pipeline(
@@ -418,7 +400,7 @@ def resource_pipeline():
     ]
 )
 def resource_with_exception_pipeline():
-    hello_world_resource_with_exception(resource_solid())
+    hello_world_resource_with_exception(resource_op())
 
 
 bad_kernel = test_nb_solid("bad_kernel")
@@ -431,12 +413,12 @@ def bad_kernel_pipeline():
 
 reimport = test_nb_solid(
     "reimport",
-    input_defs=[InputDefinition("l", List[int])],
-    output_defs=[OutputDefinition(int)],
+    ins={"l": In(List[int])},
+    outs={"result": Out(int)},
 )
 
 
-@solid
+@op
 def lister():
     return [1, 2, 3]
 
@@ -446,7 +428,7 @@ def reimport_pipeline():
     reimport(lister())
 
 
-yield_3 = test_nb_solid("yield_3", output_defs=[OutputDefinition(Int)])
+yield_3 = test_nb_solid("yield_3", outs={"result": Out(Int)})
 
 
 @pipeline(mode_defs=default_mode_defs)
@@ -476,12 +458,12 @@ def failure_pipeline():
 
 yield_something = test_nb_solid(
     "yield_something",
-    input_defs=[InputDefinition("obj", str)],
-    output_defs=[OutputDefinition(str, "result")],
+    ins={"obj": In(str)},
+    outs={"result": Out(str)},
 )
 
 
-@solid
+@op
 def fan_in(a, b):
     return f"{a} {b}"
 
@@ -540,14 +522,14 @@ def composite_pipeline():
 # Back compat
 ###################################################################################################
 
-hello_world_legacy = dagstermill.factory.define_dagstermill_solid(
+hello_world_legacy = dagstermill.factory.define_dagstermill_op(
     name="hello_world_legacy",
     notebook_path=nb_test_path("hello_world"),
-    output_notebook="notebook",
+    output_notebook_name="notebook",
 )
 
 
-@solid(input_defs=[InputDefinition("notebook", dagster_type=FileHandle)])
+@op(ins={"notebook": In(dagster_type=FileHandle)})
 def load_notebook_legacy(notebook):
     return os.path.exists(notebook.path_desc)
 
@@ -558,6 +540,7 @@ def load_notebook_legacy(notebook):
             resource_defs={
                 "io_manager": fs_io_manager,
                 "file_manager": local_file_manager,
+                "output_notebook_io_manager": local_output_notebook_io_manager,
             }
         )
     ]

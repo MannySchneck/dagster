@@ -77,7 +77,7 @@ def test_get_out_of_pipeline_context():
         mode_def=ModeDefinition(resource_defs={"list": ResourceDefinition(lambda _: [])})
     )
 
-    assert context.pipeline_name == "ephemeral_dagstermill_pipeline"
+    assert context.job_name == "ephemeral_dagstermill_pipeline"
     assert context.resources.list == []
 
 
